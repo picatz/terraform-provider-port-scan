@@ -55,6 +55,8 @@ output "open_ports" {
 }
 ```
 
+> **Note**: Try to use single ports (or small port ranges), as large port scan ranges will take a long time, since the connect timeout to the internal IP address is controlled by the SSH bastion server itself. To speed this up requires using a custom SSH server that adds a small (or configurable) timeout to the `direct-tcpip` channel type. A configurable timeout may break other SSH server's assumptions about the channel open direct message described in [`RFC 4254 7.2`](https://tools.ietf.org/html/rfc4254#section-7.2).
+
 ## Building the Provider
 
 The following steps will create a `terraform-provider-port` executable:
