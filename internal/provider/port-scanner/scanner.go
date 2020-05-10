@@ -29,7 +29,20 @@ type PortScanResult struct {
 // DefaultTimeoutPerPort is the default timeout per-port for Run
 var DefaultTimeoutPerPort = time.Second * 5
 
-var d net.Dialer
+type defaultDialer struct {
+	net.Dialer
+}
+
+func (d defaultDialer) Dial(network, address string) (net.Conn, error) {
+	return d.Dialer.Dial(network, address)
+}
+
+func (d defaultDialer) Close() error {
+	return nil
+}
+
+// DefaultDialer is the default dialer.
+var DefaultDialer = defaultDialer{}
 
 var lock *semaphore.Weighted = semaphore.NewWeighted(ulimit())
 
