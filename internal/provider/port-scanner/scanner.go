@@ -14,7 +14,7 @@ import (
 
 // Dialer implents an interface to allow for multiple network connection types
 type Dialer interface {
-	Dial(network, address string) (net.Conn, error)
+	DialTimeout(network, address string, timeout time.Duration) (net.Conn, error)
 	Close() error
 }
 
@@ -31,18 +31,33 @@ var DefaultTimeoutPerPort = time.Second * 5
 
 type defaultDialer struct {
 	net.Dialer
+	ctx            context.Context
+	cancel         context.CancelFunc
+	timeOutPerPort time.Duration
 }
 
-func (d defaultDialer) Dial(network, address string) (net.Conn, error) {
-	return d.Dialer.Dial(network, address)
+func (d *defaultDialer) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(d.ctx, timeout)
+	defer cancel()
+	return d.Dialer.DialContext(ctx, network, address)
 }
 
-func (d defaultDialer) Close() error {
+func (d *defaultDialer) Close() error {
+	d.cancel()
 	return nil
 }
 
 // DefaultDialer is the default dialer.
-var DefaultDialer = defaultDialer{}
+var DefaultDialer *defaultDialer
+
+func init() {
+	ctx, cancel := context.WithCancel(context.Background())
+	DefaultDialer = &defaultDialer{
+		ctx:            ctx,
+		cancel:         cancel,
+		timeOutPerPort: DefaultTimeoutPerPort,
+	}
+}
 
 var lock *semaphore.Weighted = semaphore.NewWeighted(ulimit())
 
@@ -66,7 +81,7 @@ func scanPort(d Dialer, ip string, port int, timeout time.Duration) (result Port
 
 	target := fmt.Sprintf("%s:%d", ip, port)
 
-	conn, err := d.Dial("tcp", target)
+	conn, err := d.DialTimeout("tcp", target, timeout)
 	if err != nil {
 		if strings.Contains(err.Error(), "too many open files") {
 			time.Sleep(timeout)
