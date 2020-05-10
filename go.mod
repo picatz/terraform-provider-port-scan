@@ -1,4 +1,4 @@
-module github.com/picatz/terraform-provider-ports
+module github.com/picatz/terraform-provider-port-scan
 
 go 1.14
 

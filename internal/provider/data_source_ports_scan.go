@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	scanner "github.com/picatz/terraform-provider-ports/internal/provider/port-scanner"
+	scanner "github.com/picatz/terraform-provider-port-scan/internal/provider/port-scanner"
 )
 
 func dataSourcePortScan() *schema.Resource {
