@@ -170,17 +170,23 @@ func (b *SSHBastionScanner) Close() error {
 }
 
 func NewSSHBastionScanner(addr string, config *ssh.ClientConfig) (Dialer, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	conn, err := net.DialTimeout("tcp", addr, config.Timeout)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	sshClientConn, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	sshClient := ssh.NewClient(sshClientConn, chans, reqs)
 
 	scanner := &SSHBastionScanner{
+		ctx:    ctx,
+		cancel: cancel,
 		Conn:   conn,
 		Client: sshClient,
 	}
