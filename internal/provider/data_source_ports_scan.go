@@ -70,9 +70,13 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 		toPort = d.Get("to_port").(int)
 	}
 
+	// default dialer
+	var dialer scanner.Dialer = scanner.DefaultDialer
+	defer dialer.Close()
+
 	openPorts := []int{}
 
-	for result := range scanner.Run(context.Background(), ipAddress, fromPort, toPort, scanner.DefaultTimeoutPerPort) {
+	for result := range scanner.Run(dialer, ipAddress, fromPort, toPort, scanner.DefaultTimeoutPerPort) {
 		if result.Open {
 			openPorts = append(openPorts, result.Port)
 		}
