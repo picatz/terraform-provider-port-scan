@@ -12,6 +12,12 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+// Dialer implents an interface to allow for multiple network connection types
+type Dialer interface {
+	Dial(network, address string) (net.Conn, error)
+	Close() error
+}
+
 // PortScanResult is the type returned by the Run func result chan
 type PortScanResult struct {
 	IP    string
