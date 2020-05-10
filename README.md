@@ -7,12 +7,29 @@ Terraform Provider for performing TCP connect-based port scans.
 ```hcl
 data "port_scan" "example" {
   ip_address = "127.0.0.1"
-  port       = 5959
+  from_port  = 1
+  to_port    = 65535
 }
 
 output "open_ports" {
   value = data.port_scan.example.open_ports
 }
+```
+
+```console
+$ terraform plan
+...
+data.port_scan.example: Refreshing state...
+...
+```
+
+```console
+$ terraform apply
+...
+
+Outputs:
+
+open_ports = []
 ```
 
 ## Building the Provider
