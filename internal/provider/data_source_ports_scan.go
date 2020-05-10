@@ -1,7 +1,10 @@
 package provider
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -136,7 +139,8 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 
 		// if using ssh key
 		if _, ok := d.GetOk("ssh_bastion.0.private_key"); ok {
-			authMethod, err := sshKey("ssh_bastion.0.private_key")
+			pem_encoded_private_key := d.Get("ssh_bastion.0.private_key").(string)
+			authMethod, err := sshKey(pem_encoded_private_key)
 			if err != nil {
 				return err
 			}
@@ -169,7 +173,16 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 }
 
 func sshKey(key string) (ssh.AuthMethod, error) {
-	signer, err := ssh.ParsePrivateKey([]byte(key))
+	var trimmedKey string
+
+	bufioScanner := bufio.NewScanner(bytes.NewReader([]byte(key)))
+	for bufioScanner.Scan() {
+		if len(bufioScanner.Bytes()) > 0 {
+			trimmedKey += strings.TrimSpace(bufioScanner.Text()) + "\n"
+		}
+	}
+
+	signer, err := ssh.ParsePrivateKey([]byte(trimmedKey))
 	if err != nil {
 		return nil, err
 	}
