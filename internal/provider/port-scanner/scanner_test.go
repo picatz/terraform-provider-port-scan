@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"testing"
@@ -31,7 +30,10 @@ func Test_scanPort_open(t *testing.T) {
 		time.Sleep(10 * time.Second)
 	}()
 
-	scanPort(context.Background(), "127.0.0.1", port, DefaultTimeoutPerPort)
+	result := scanPort(DefaultDialer, "127.0.0.1", port, DefaultTimeoutPerPort)
+	if !result.Open {
+		t.Fatalf("Expected port %d to be open", port)
+	}
 }
 
 func Test_scanPort_closed(t *testing.T) {
@@ -43,7 +45,10 @@ func Test_scanPort_closed(t *testing.T) {
 	}
 	listener.Close()
 
-	scanPort(context.Background(), "127.0.0.1", port, DefaultTimeoutPerPort)
+	result := scanPort(DefaultDialer, "127.0.0.1", port, DefaultTimeoutPerPort)
+	if result.Open {
+		t.Fatalf("Expected port %d to be closed", port)
+	}
 }
 
 func Test_scanPort_Run(t *testing.T) {
@@ -64,7 +69,7 @@ func Test_scanPort_Run(t *testing.T) {
 		time.Sleep(10 * time.Second)
 	}()
 
-	for result := range Run(context.Background(), "127.0.0.1", 5000, 6000, DefaultTimeoutPerPort) {
+	for result := range Run(DefaultDialer, "127.0.0.1", 5000, 6000, DefaultTimeoutPerPort) {
 		if result.Port == port {
 			if !result.Open {
 				t.Fatalf("Expected open port %d to be open, but was closed", port)
@@ -95,7 +100,7 @@ func Test_scanPort_Run_sameFromAndToPort(t *testing.T) {
 		time.Sleep(10 * time.Second)
 	}()
 
-	for result := range Run(context.Background(), "127.0.0.1", 5959, 5959, DefaultTimeoutPerPort) {
+	for result := range Run(DefaultDialer, "127.0.0.1", 5959, 5959, DefaultTimeoutPerPort) {
 		if result.Port == port {
 			if !result.Open {
 				t.Fatalf("Expected open port %d to be open, but was closed", port)
