@@ -122,6 +122,7 @@ func Run(d Dialer, ip string, firstPort, lastPort int, timeoutPerPort time.Durat
 	return results
 }
 
+// SSHBastionScanner is a Dialer that uses an SSH bastion to establish connections for the port scan.
 type SSHBastionScanner struct {
 	Conn           net.Conn
 	Client         *ssh.Client
@@ -130,6 +131,7 @@ type SSHBastionScanner struct {
 	timeOutPerPort time.Duration
 }
 
+// DialTimeout implements the Dialer interface
 func (b *SSHBastionScanner) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(b.ctx, timeout)
 	defer cancel()
@@ -164,11 +166,13 @@ func (b *SSHBastionScanner) DialTimeout(network, address string, timeout time.Du
 	}
 }
 
+// Close implements the Dialer interface
 func (b *SSHBastionScanner) Close() error {
 	b.cancel()
 	return nil
 }
 
+// NewSSHBastionScanner creates a new SSHBastionScanner Dialer type
 func NewSSHBastionScanner(addr string, config *ssh.ClientConfig) (Dialer, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
