@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"log"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	scanner "github.com/picatz/terraform-provider-port-scan/internal/provider/port-scanner"
@@ -47,8 +46,6 @@ func dataSourcePortScan() *schema.Resource {
 }
 
 func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
-	log.Println("[DEBUG] performing port scan")
-
 	// Note: this took me FOREVER to figure out I needed to set an ID...
 	//       so everything would seemingly almost work, but the attributes
 	//       would never get set!
@@ -80,8 +77,6 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 			openPorts = append(openPorts, result.Port)
 		}
 	}
-
-	log.Printf("[DEBUG] found %d open ports", len(openPorts))
 
 	return d.Set("open_ports", openPorts)
 }
