@@ -17,10 +17,12 @@ output "open_ports" {
 
 ## Building the Provider
 
+The following steps will create a `terraform-provider-port` executable:
+
 ```console
 git clone https://github.com/picatz/terraform-provider-port-scan.git
 cd terraform-provider-port-scan
 make build
 ```
 
-After the build is complete, if your terraform running folder does not match your GOPATH environment, you need to copy the `terraform-provider-port` executable to your running folder and re-run `terraform init` to make terraform aware of your local provider executable.
+After the build is complete, you will need to copy the `terraform-provider-port` executable over and re-run `terraform init` to make Terraform aware of your local provider executable.
