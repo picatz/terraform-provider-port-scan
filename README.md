@@ -1,6 +1,6 @@
 # Terraform Provider Ports Scan
 
-Terraform Provider for performing a TCP connect-based port scans.
+Terraform Provider for performing TCP connect-based port scans.
 
 ```hcl
 data "ports_scan" "example" {

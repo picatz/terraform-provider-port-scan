@@ -8,7 +8,7 @@ description: |-
 
 # Port Scan Provider
 
-Terraform Provider for performing a TCP connect-based port scans.
+Terraform Provider for performing TCP connect-based port scans.
 
 ## Example Usage
 
