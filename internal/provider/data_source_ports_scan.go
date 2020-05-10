@@ -1,10 +1,12 @@
 package provider
 
 import (
-	"context"
+	"fmt"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	scanner "github.com/picatz/terraform-provider-port-scan/internal/provider/port-scanner"
+	"golang.org/x/crypto/ssh"
 )
 
 func dataSourcePortScan() *schema.Resource {
@@ -32,6 +34,45 @@ func dataSourcePortScan() *schema.Resource {
 				Optional: true,
 				Type:     schema.TypeInt,
 				Default:  1024,
+			},
+			// Optional SSH Bastion
+			"ssh_bastion": {
+				Type:     schema.TypeList,
+				Optional: true,
+				MaxItems: 1,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"ip_address": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "SSH bastion IP address",
+						},
+						"port": {
+							Type:        schema.TypeInt,
+							Default:     22,
+							Optional:    true,
+							Description: "SSH port",
+						},
+						"user": {
+							Type:        schema.TypeString,
+							Default:     "root",
+							Optional:    true,
+							Description: "SSH username",
+						},
+						"password": {
+							Type:        schema.TypeString,
+							Sensitive:   true,
+							Optional:    true,
+							Description: "SSH password",
+						},
+						"private_key": {
+							Type:        schema.TypeString,
+							Sensitive:   true,
+							Optional:    true,
+							Description: "PEM encoded SSH private key",
+						},
+					},
+				},
 			},
 			// Computed fields
 			"open_ports": {
@@ -73,6 +114,48 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 	// default dialer
 	var dialer scanner.Dialer = scanner.DefaultDialer
 	defer dialer.Close()
+
+	// check if using SSH bastion
+	if _, ok := d.GetOk("ssh_bastion"); ok {
+		var (
+			bastionConnectTimeout time.Duration = 2 * time.Minute
+			bastionUser           string        = d.Get("ssh_bastion.0.user").(string)
+			bastionAddress        string        = fmt.Sprintf(
+				"%s:%d",
+				d.Get("ssh_bastion.0.ip_address").(string),
+				d.Get("ssh_bastion.0.port").(int),
+			)
+			sshClientConfig *ssh.ClientConfig = &ssh.ClientConfig{
+				Timeout: bastionConnectTimeout,
+				User:    bastionUser,
+				Auth:    []ssh.AuthMethod{},
+				// TODO(kent): don't use insecure ignore host key...
+				HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			}
+		)
+
+		// if using ssh key
+		if _, ok := d.GetOk("ssh_bastion.0.private_key"); ok {
+			authMethod, err := sshKey("ssh_bastion.0.private_key")
+			if err != nil {
+				return err
+			}
+			sshClientConfig.Auth = append(sshClientConfig.Auth, authMethod)
+		} else { // using password
+			if _, ok := d.GetOk("ssh_bastion.0.password"); ok {
+				sshClientConfig.Auth = append(sshClientConfig.Auth, ssh.Password(d.Get("ssh_bastion.0.password").(string)))
+			} else { // no idea what we're using
+				return fmt.Errorf("no SSH private_key or password provided")
+			}
+		}
+
+		sshDialer, err := scanner.NewSSHBastionScanner(bastionAddress, sshClientConfig)
+		if err != nil {
+			return err
+		}
+
+		dialer = sshDialer
+	}
 
 	openPorts := []int{}
 
