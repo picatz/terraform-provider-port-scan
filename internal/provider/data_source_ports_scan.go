@@ -85,3 +85,11 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 
 	return d.Set("open_ports", openPorts)
 }
+
+func sshKey(key string) (ssh.AuthMethod, error) {
+	signer, err := ssh.ParsePrivateKey([]byte(key))
+	if err != nil {
+		return nil, err
+	}
+	return ssh.PublicKeys(signer), nil
+}
