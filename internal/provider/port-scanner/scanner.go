@@ -43,7 +43,7 @@ func ulimit() int64 {
 	return int64(rLimit.Cur)
 }
 
-func scanPort(ctx context.Context, ip string, port int, timeout time.Duration) (result PortScanResult) {
+func scanPort(d Dialer, ip string, port int, timeout time.Duration) (result PortScanResult) {
 	if timeout == 0 {
 		timeout = DefaultTimeoutPerPort
 	}
@@ -53,14 +53,11 @@ func scanPort(ctx context.Context, ip string, port int, timeout time.Duration) (
 
 	target := fmt.Sprintf("%s:%d", ip, port)
 
-	ctxForPort, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	conn, err := d.DialContext(ctxForPort, "tcp", target)
+	conn, err := d.Dial("tcp", target)
 	if err != nil {
 		if strings.Contains(err.Error(), "too many open files") {
 			time.Sleep(timeout)
-			scanPort(ctxForPort, ip, port, timeout)
+			scanPort(d, ip, port, timeout)
 		} else {
 			result.Error = err
 		}
@@ -72,7 +69,7 @@ func scanPort(ctx context.Context, ip string, port int, timeout time.Duration) (
 }
 
 // Run will perform a port scan for the given IP, starting at the firstPort to the lastPort
-func Run(ctx context.Context, ip string, firstPort, lastPort int, timeoutPerPort time.Duration) <-chan PortScanResult {
+func Run(d Dialer, ip string, firstPort, lastPort int, timeoutPerPort time.Duration) <-chan PortScanResult {
 	results := make(chan PortScanResult)
 
 	go func() {
@@ -81,12 +78,12 @@ func Run(ctx context.Context, ip string, firstPort, lastPort int, timeoutPerPort
 		wg := sync.WaitGroup{}
 
 		for port := firstPort; port <= lastPort; port++ {
-			lock.Acquire(ctx, 1)
+			lock.Acquire(context.Background(), 1)
 			wg.Add(1)
 			go func(port int) {
 				defer lock.Release(1)
 				defer wg.Done()
-				results <- scanPort(ctx, ip, port, timeoutPerPort)
+				results <- scanPort(d, ip, port, timeoutPerPort)
 			}(port)
 		}
 
