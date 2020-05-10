@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -119,4 +120,70 @@ func Run(d Dialer, ip string, firstPort, lastPort int, timeoutPerPort time.Durat
 	}()
 
 	return results
+}
+
+type SSHBastionScanner struct {
+	Conn           net.Conn
+	Client         *ssh.Client
+	ctx            context.Context
+	cancel         context.CancelFunc
+	timeOutPerPort time.Duration
+}
+
+func (b *SSHBastionScanner) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(b.ctx, timeout)
+	defer cancel()
+
+	connChan := make(chan net.Conn, 1)
+	errChan := make(chan error, 1)
+
+	go func() {
+		conn, err := b.Client.Dial(network, address)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+			case errChan <- err:
+			}
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			conn.Close()
+		case connChan <- conn:
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case conn := <-connChan:
+		return conn, nil
+	case err := <-errChan:
+		return nil, err
+	}
+}
+
+func (b *SSHBastionScanner) Close() error {
+	b.cancel()
+	return nil
+}
+
+func NewSSHBastionScanner(addr string, config *ssh.ClientConfig) (Dialer, error) {
+	conn, err := net.DialTimeout("tcp", addr, config.Timeout)
+	if err != nil {
+		return nil, err
+	}
+	sshClientConn, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
+	if err != nil {
+		return nil, err
+	}
+	sshClient := ssh.NewClient(sshClientConn, chans, reqs)
+
+	scanner := &SSHBastionScanner{
+		Conn:   conn,
+		Client: sshClient,
+	}
+
+	return scanner, nil
 }
