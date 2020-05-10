@@ -1,4 +1,4 @@
-# Terraform Provider Ports Scan
+# Terraform Provider Port Scan
 
 Terraform Provider for performing TCP connect-based port scans.
 
