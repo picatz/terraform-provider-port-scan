@@ -255,6 +255,7 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer sshBastionDialer.Close()
 
 	for result := range Run(sshBastionDialer, "127.0.0.1", 5959, 5959, DefaultTimeoutPerPort) {
 		if result.Port == port {
