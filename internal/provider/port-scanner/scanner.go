@@ -81,12 +81,20 @@ func scanPort(d Dialer, ip string, port int, timeout time.Duration) (result Port
 	conn, err := d.DialTimeout("tcp", target, timeout)
 	if err != nil {
 		if strings.Contains(err.Error(), "too many open files") {
-			time.Sleep(timeout)
-			scanPort(d, ip, port, timeout)
+			for {
+				time.Sleep(timeout)
+				conn, err = d.DialTimeout("tcp", target, timeout)
+				if strings.Contains(err.Error(), "too many open files") {
+					continue
+				} else {
+					result.Error = err
+					return
+				}
+			}
 		} else {
 			result.Error = err
+			return
 		}
-		return
 	}
 	conn.Close()
 	result.Open = true
