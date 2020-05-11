@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/subtle"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"log"
@@ -164,12 +165,12 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 
 	serverReady := make(chan bool, 1)
 
-	go func() {
-		private, err := genRSASSHHostKey()
-		if err != nil {
-			panic(err)
-		}
+	private, err := genRSASSHHostKey()
+	if err != nil {
+		panic(err)
+	}
 
+	go func() {
 		config := &ssh.ServerConfig{
 			PasswordCallback: func(conn ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 				if conn.User() != "root" {
@@ -259,7 +260,8 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 	sshBastionDialer, err := NewSSHBastionScanner("127.0.0.1:2222", &ssh.ClientConfig{
 		User:            "root",
 		Auth:            []ssh.AuthMethod{ssh.Password("password")},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKey(base64.StdEncoding.EncodeToString(private.PublicKey().Marshal())),
+		// HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -269,7 +271,6 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 	var results = 0
 
 	//for result := range Run(sshBastionDialer, "127.0.0.1", 5959, 5959, DefaultTimeoutPerPort) {
-	//for result := range Run(sshBastionDialer, "127.0.0.1", 1, 65535, DefaultTimeoutPerPort) {
 	for result := range Run(sshBastionDialer, "127.0.0.1", 1, 65535, DefaultTimeoutPerPort) {
 		results++
 		if result.Port == port || result.Port == 2222 {
@@ -284,7 +285,7 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 	}
 
 	if results != 65535 {
-		t.Errorf("Expected %d results, got %d", 1, results)
+		t.Errorf("Expected %d results, got %d", 65535, results)
 	}
 }
 
@@ -319,4 +320,18 @@ func genRSASSHHostKey() (ssh.Signer, error) {
 	}
 
 	return private, nil
+}
+
+func hostKey(hostKeyBase64 string) ssh.HostKeyCallback {
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		// TODO(kent): add check hostname/remote
+		hostKeyBytes, err := base64.StdEncoding.DecodeString(hostKeyBase64)
+		if err != nil {
+			return err
+		}
+		if subtle.ConstantTimeCompare(key.Marshal(), hostKeyBytes) != 1 {
+			return fmt.Errorf("ssh: server host key failed to match")
+		}
+		return nil
+	}
 }
