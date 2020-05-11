@@ -52,6 +52,8 @@ data "port_scan" "nomad_server" {
     user        = "ubuntu"
     ip_address  = "34.75.85.111"
     private_key = file("private_key.pem")
+
+    insecure_ignore_host_key = true
   }
 }
 
