@@ -36,22 +36,27 @@ open_ports = []
 
 When the hosts aren't publicly available, we can use an SSH bastion jump-box for port scanning.
 
-For example, after using the [`picatz/terraform-google-nomad`](https://github.com/picatz/terraform-google-nomad) provider, we can verify the Nomad server is up through the SSH bastion:
+For example, after using the [`picatz/terraform-google-nomad`](https://github.com/picatz/terraform-google-nomad) provider, we can verify the Nomad server (`192.168.2.2`) is up through the SSH bastion:
 
 ```hcl
-data "port_scan" "example" {
+data "port_scan" "nomad_server" {
   ip_address = "192.168.2.2"
-  port       = 4646
+  ports = [
+    22,
+    4648,
+    4647,
+    4646,
+  ]
 
-    ssh_bastion {
-        user        = "ubuntu"
-        ip_address  = "34.75.85.111"
-        private_key = file("private_key.pem")
-    }
+  ssh_bastion {
+    user        = "ubuntu"
+    ip_address  = "34.75.85.111"
+    private_key = file("private_key.pem")
+  }
 }
 
 output "open_ports" {
-  value = data.port_scan.example.open_ports
+  value = data.port_scan.nomad_server.open_ports
 }
 ```
 
