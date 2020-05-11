@@ -3,7 +3,10 @@ package provider
 import (
 	"bufio"
 	"bytes"
+	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -82,6 +85,18 @@ func dataSourcePortScan() *schema.Resource {
 							Optional:    true,
 							Description: "PEM encoded SSH private key",
 						},
+						"host_key": {
+							Type:        schema.TypeString,
+							Sensitive:   true,
+							Optional:    true,
+							Description: "Base64 encoded SSH bastion host key",
+						},
+						"insecure_ignore_host_key": {
+							Type:        schema.TypeBool,
+							Sensitive:   true,
+							Optional:    true,
+							Description: "Skip SSH bastion host key checkinng",
+						},
 					},
 				},
 			},
@@ -148,10 +163,18 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 				Timeout: bastionConnectTimeout,
 				User:    bastionUser,
 				Auth:    []ssh.AuthMethod{},
-				// TODO(kent): don't use insecure ignore host key...
-				HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			}
 		)
+
+		// check if known host key or insecure ignore host key
+		if v, ok := d.GetOk("ssh_bastion.0.host_key"); ok {
+			sshClientConfig.HostKeyCallback = hostKey(v.(string))
+		} else {
+			insecureHostKeyCheck := d.Get("ssh_bastion.0.insecure_ignore_host_key").(bool)
+			if insecureHostKeyCheck {
+				sshClientConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+			}
+		}
 
 		// if using ssh key
 		if _, ok := d.GetOk("ssh_bastion.0.private_key"); ok {
@@ -225,4 +248,18 @@ func convertIntArr(ifaceArr []interface{}) []int {
 		arr = append(arr, v.(int))
 	}
 	return arr
+}
+
+func hostKey(hostKeyBase64 string) ssh.HostKeyCallback {
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		// TODO(kent): add check hostname/remote
+		hostKeyBytes, err := base64.StdEncoding.DecodeString(hostKeyBase64)
+		if err != nil {
+			return err
+		}
+		if subtle.ConstantTimeCompare(key.Marshal(), hostKeyBytes) != 1 {
+			return fmt.Errorf("ssh: server host key failed to match")
+		}
+		return nil
+	}
 }
