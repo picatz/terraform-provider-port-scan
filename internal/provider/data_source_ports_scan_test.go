@@ -9,7 +9,7 @@ import (
 )
 
 const testDataSourceUnknownKeyError = `
-data "ports_scan" "example" {
+data "port_scan" "example" {
 	this_doesnt_exist = "foo"
 }
 `
@@ -38,7 +38,7 @@ func TestDataSource_compileUnknownKeyError(t *testing.T) {
 }
 
 const testDataSourceLocalhost5959 = `
-data "ports_scan" "example" {
+data "port_scan" "example" {
 	ip_address = "127.0.0.1"
 	port       = 5959
 }
