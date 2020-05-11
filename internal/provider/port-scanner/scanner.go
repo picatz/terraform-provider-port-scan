@@ -73,10 +73,6 @@ func ulimit() int64 {
 }
 
 func scanPort(d Dialer, ip string, port int, timeout time.Duration) (result PortScanResult) {
-	if timeout == 0 {
-		timeout = DefaultTimeoutPerPort
-	}
-
 	result.IP = ip
 	result.Port = port
 
