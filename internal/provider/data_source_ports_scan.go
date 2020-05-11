@@ -26,6 +26,14 @@ func dataSourcePortScan() *schema.Resource {
 				Optional: true,
 				Type:     schema.TypeInt,
 			},
+			"ports": {
+				ForceNew: true,
+				Optional: true,
+				Type:     schema.TypeList,
+				Elem: &schema.Schema{
+					Type: schema.TypeInt,
+				},
+			},
 			"from_port": {
 				ForceNew: true,
 				Optional: true,
@@ -99,6 +107,7 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 		ipAddress string
 		fromPort  int
 		toPort    int
+		ports     []int
 	)
 
 	// First, grab the require IP address
@@ -109,9 +118,16 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 	if ok {
 		fromPort = port.(int)
 		toPort = port.(int)
-	} else { // using range
-		fromPort = d.Get("from_port").(int)
-		toPort = d.Get("to_port").(int)
+	} else {
+		// using range
+		if portsConfig, ok := d.GetOk("ports"); ok {
+			if portIfaceSlice, ok := portsConfig.([]interface{}); ok {
+				ports = convertIntArr(portIfaceSlice)
+			}
+		} else {
+			fromPort = d.Get("from_port").(int)
+			toPort = d.Get("to_port").(int)
+		}
 	}
 
 	// default dialer
@@ -139,8 +155,8 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 
 		// if using ssh key
 		if _, ok := d.GetOk("ssh_bastion.0.private_key"); ok {
-			pem_encoded_private_key := d.Get("ssh_bastion.0.private_key").(string)
-			authMethod, err := sshKey(pem_encoded_private_key)
+			pemEncodedPrivateKey := d.Get("ssh_bastion.0.private_key").(string)
+			authMethod, err := sshKey(pemEncodedPrivateKey)
 			if err != nil {
 				return err
 			}
@@ -163,10 +179,21 @@ func dataSourcePortScanRead(d *schema.ResourceData, meta interface{}) error {
 
 	openPorts := []int{}
 
-	for result := range scanner.Run(dialer, ipAddress, fromPort, toPort, scanner.DefaultTimeoutPerPort) {
-		if result.Open {
-			openPorts = append(openPorts, result.Port)
+	if len(ports) > 0 {
+		for _, port := range ports {
+			for result := range scanner.Run(dialer, ipAddress, port, port, scanner.DefaultTimeoutPerPort) {
+				if result.Open {
+					openPorts = append(openPorts, result.Port)
+				}
+			}
 		}
+	} else {
+		for result := range scanner.Run(dialer, ipAddress, fromPort, toPort, scanner.DefaultTimeoutPerPort) {
+			if result.Open {
+				openPorts = append(openPorts, result.Port)
+			}
+		}
+
 	}
 
 	return d.Set("open_ports", openPorts)
@@ -187,4 +214,15 @@ func sshKey(key string) (ssh.AuthMethod, error) {
 		return nil, err
 	}
 	return ssh.PublicKeys(signer), nil
+}
+
+func convertIntArr(ifaceArr []interface{}) []int {
+	var arr []int
+	for _, v := range ifaceArr {
+		if v == nil {
+			continue
+		}
+		arr = append(arr, v.(int))
+	}
+	return arr
 }
