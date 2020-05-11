@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,7 +79,9 @@ func Test_scanPort_Run(t *testing.T) {
 		time.Sleep(10 * time.Second)
 	}()
 
+	var results = 0
 	for result := range Run(DefaultDialer, "127.0.0.1", 5000, 6000, DefaultTimeoutPerPort) {
+		results++
 		if result.Port == port {
 			if !result.Open {
 				t.Fatalf("Expected open port %d to be open, but was closed", port)
@@ -88,6 +91,10 @@ func Test_scanPort_Run(t *testing.T) {
 				t.Errorf("Unexpected open port %d", port)
 			}
 		}
+	}
+
+	if results != 1001 {
+		t.Errorf("Expected %d results, got %d", 1, results)
 	}
 }
 
@@ -109,7 +116,10 @@ func Test_scanPort_Run_sameFromAndToPort(t *testing.T) {
 		time.Sleep(10 * time.Second)
 	}()
 
+	var results = 0
+
 	for result := range Run(DefaultDialer, "127.0.0.1", 5959, 5959, DefaultTimeoutPerPort) {
+		results++
 		if result.Port == port {
 			if !result.Open {
 				t.Fatalf("Expected open port %d to be open, but was closed", port)
@@ -120,8 +130,13 @@ func Test_scanPort_Run_sameFromAndToPort(t *testing.T) {
 			}
 		}
 	}
+
+	if results != 1 {
+		t.Errorf("Expected %d results, got %d", 1, results)
+	}
 }
 
+// $ go test -timeout 10m github.com/picatz/terraform-provider-port-scan/internal/provider/port-scanner -run Test_scanPort_Run_withSSHBastion -v
 func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 	// setp fake service on localhost
 	serviceReady := make(chan bool, 1)
@@ -141,7 +156,8 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 			return
 		}
 		defer conn.Close()
-		time.Sleep(10 * time.Second)
+		log.Println("5959 service hit by bastion")
+		time.Sleep(30 * time.Second)
 	}()
 
 	// setup test SSH server on localhost:2222
@@ -188,6 +204,7 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
+		defer log.Println("Closing SSH server")
 		defer sshConn.Close()
 
 		go ssh.DiscardRequests(reqs)
@@ -195,7 +212,7 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 		log.Println("Serving SSH channel reqs")
 		for newChan := range chans {
 			if newChan.ChannelType() != "direct-tcpip" {
-				log.Printf("New direct-tcpip chan req %#+v", newChan)
+				log.Printf("New chan req %#+v", newChan)
 				panic(fmt.Sprintf("Expected new chan req to be 'direct-tcpip', got %q", newChan.ChannelType()))
 			}
 
@@ -206,24 +223,21 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 				panic(err)
 			}
 
-			log.Printf("channelOpenDirectMsg %#+v", msg)
-
-			// spot check
+			// log.Printf("channelOpenDirectMsg %#+v", msg)
 
 			// the request remote addr to connect to should be localhost
 			if msg.Raddr != "127.0.0.1" {
 				panic(fmt.Sprintf("Unexpect remote address request: %#+v", msg.Raddr))
 			}
 
-			// the request remote port to connect to should be 5959
-			if int(msg.Rport) != 5959 {
-				panic(fmt.Sprintf("Unexpect remote port request: %#+v", msg.Rport))
-			}
-
 			// perform connection
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", msg.Raddr, int(msg.Rport)), time.Second*10)
+			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", msg.Raddr, int(msg.Rport)), time.Second*5)
 			if err != nil {
-				panic(err)
+				if !strings.Contains(err.Error(), "connect: connection refused") {
+					panic(err)
+				}
+				newChan.Reject(ssh.ConnectionFailed, err.Error())
+				continue
 			}
 			conn.Close()
 
@@ -234,14 +248,9 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 			}
 			defer acceptedChan.Close()
 
-			for req := range chanReqs {
-				log.Printf("New direct-tcpip nested chan req %#+v", req)
-			}
+			go ssh.DiscardRequests(chanReqs)
 		}
 
-		time.Sleep(10 * time.Second)
-
-		log.Println("Closing SSH server")
 	}()
 
 	<-serverReady
@@ -257,16 +266,25 @@ func Test_scanPort_Run_withSSHBastion(t *testing.T) {
 	}
 	defer sshBastionDialer.Close()
 
-	for result := range Run(sshBastionDialer, "127.0.0.1", 5959, 5959, DefaultTimeoutPerPort) {
-		if result.Port == port {
+	var results = 0
+
+	//for result := range Run(sshBastionDialer, "127.0.0.1", 5959, 5959, DefaultTimeoutPerPort) {
+	//for result := range Run(sshBastionDialer, "127.0.0.1", 1, 65535, DefaultTimeoutPerPort) {
+	for result := range Run(sshBastionDialer, "127.0.0.1", 1, 65535, DefaultTimeoutPerPort) {
+		results++
+		if result.Port == port || result.Port == 2222 {
 			if !result.Open {
-				t.Fatalf("Expected open port %d to be open, but was closed", port)
+				t.Fatalf("Expected open port %d to be open, but was closed with error %q", port, result.Error.Error())
 			}
 		} else {
 			if result.Open {
-				t.Errorf("Unexpected open port %d", port)
+				t.Errorf("Unexpected open port %d", result.Port)
 			}
 		}
+	}
+
+	if results != 65535 {
+		t.Errorf("Expected %d results, got %d", 1, results)
 	}
 }
 
