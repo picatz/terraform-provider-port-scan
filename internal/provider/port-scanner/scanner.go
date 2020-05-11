@@ -137,35 +137,40 @@ type SSHBastionScanner struct {
 
 // DialTimeout implements the Dialer interface
 func (b *SSHBastionScanner) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
-	ctx, cancel := context.WithTimeout(b.ctx, timeout)
-	defer cancel()
+	// ctx, cancel := context.WithTimeout(b.ctx, timeout)
+	// defer cancel()
 
 	connChan := make(chan net.Conn, 1)
 	errChan := make(chan error, 1)
 
 	go func() {
+		// log.Printf("[DEBUG] dialing %s", address)
+		// defer log.Printf("[DEBUG] done dialing %s", address)
 		conn, err := b.Client.Dial(network, address)
 		if err != nil {
 			select {
-			case <-ctx.Done():
+			// case <-ctx.Done():
 			case errChan <- err:
 			}
 			return
 		}
 
 		select {
-		case <-ctx.Done():
-			conn.Close()
+		//case <-ctx.Done():
+		//	conn.Close()
 		case connChan <- conn:
 		}
 	}()
 
 	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	// case <-ctx.Done():
+	// 	log.Printf("[DEBUG] ctx done %s", address)
+	// 	return nil, ctx.Err()
 	case conn := <-connChan:
+		// log.Printf("[DEBUG] got conn %s", address)
 		return conn, nil
 	case err := <-errChan:
+		// log.Printf("[DEBUG] got err %s %q", address, err.Error())
 		return nil, err
 	}
 }
