@@ -41,9 +41,9 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v1
 
-    - name: Build Provider
+    - name: Install Provider
       run: |
-        make build
+        make install
 
     - name: Setup Terraform Test File
       run: |
