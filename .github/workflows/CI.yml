@@ -10,8 +10,8 @@ on:
 
 jobs:
 
-  build:
-    name: Build
+  test:
+    name: Test
     runs-on: ubuntu-latest
 
     services:
@@ -89,10 +89,9 @@ jobs:
       run: |
         terraform apply -auto-approve
 
-    - name: Verify Outputs
-      continue-on-error: true 
+    - name: Verify Output
       run: |
-        if terraform output -json open_ports | jq 'contains([8200, 8600])' | grep --silent true; then 
+        if terraform output -json open_ports | jq 'contains([8200, 8500])' | grep --silent true; then 
           echo "✅ Successfully verified Terraform's output!"
         else
           echo "❌ Terraform's output was unexpected!"
