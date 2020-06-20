@@ -38,14 +38,7 @@ jobs:
       run: |
         go get -v -t -d ./...
         
-    - name: Setup Terraform
-      env: 
-        TERRAFORM_VERSION: 0.12.26
-      run: |
-        wget "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
-        unzip "terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
-        sudo mv terraform /usr/local/bin
-        rm "terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+    - uses: hashicorp/setup-terraform@v1.1.0
 
     - name: Build Provider
       run: |
@@ -91,7 +84,7 @@ jobs:
 
     - name: Verify Output
       run: |
-        if terraform output -json open_ports | jq 'contains([8200, 8500])' | grep --silent true; then 
+        if terraform output -json open_ports | grep --silent "[8200,8500]"; then 
           echo "✅ Successfully verified Terraform's output!"
         else
           echo "❌ Terraform's output was unexpected!"
