@@ -46,7 +46,7 @@ jobs:
 
     - name: Install Provider
       run: |
-        mkdir -p ~/.local/share/terraform/plugins/terraform.local/picatz/portscan/1.0.0/linux_amd64
+        mkdir -p ~/.local/share/terraform/plugins/terraform.local/picatz/port/1.0.0/linux_amd64
         mv terraform-provider-port ~/.local/share/terraform/plugins/terraform.local/picatz/port/1.0.0/linux_amd64
 
     - name: Setup Terraform Test File
