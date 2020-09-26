@@ -37,18 +37,32 @@ jobs:
     - name: Get dependencies
       run: |
         go get -v -t -d ./...
-        
+
     - uses: hashicorp/setup-terraform@v1.1.0
 
     - name: Build Provider
       run: |
         make build
 
+    - name: Install Provider
+      run: |
+        mkdir -p ~/.local/share/terraform/plugins/terraform.local/picatz/port/1.0.0/linux_amd64
+        mv terraform-provider-port ~/.local/share/terraform/plugins/terraform.local/picatz/port/1.0.0/linux_amd64
+
     - name: Setup Terraform Test File
       run: |
         touch main.tf
 
         echo '
+          terraform {
+            required_providers {
+              port = {
+                source  = "terraform.local/picatz/port"
+                version = "1.0.0"
+              }
+            }
+          }
+
           data "port_scan" "example" {
             ip_address = "127.0.0.1"
             ports      = [8200, 8500]
@@ -76,15 +90,15 @@ jobs:
       continue-on-error: true
       run: |
         terraform plan
-        
+
     - name: Terraform Apply
-      continue-on-error: true 
+      continue-on-error: true
       run: |
         terraform apply -auto-approve
 
     - name: Verify Output
       run: |
-        if terraform output -json open_ports | grep --silent "[8200,8500]"; then 
+        if terraform output -json open_ports | grep --silent "[8200,8500]"; then
           echo "✅ Successfully verified Terraform's output!"
         else
           echo "❌ Terraform's output was unexpected!"
